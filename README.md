@@ -7,13 +7,14 @@
 
 ## 功能
 
-- 🔍 关键词搜索，**三平台价格并列对比**：1688（国内批发价）/ Amazon 美国站 / eBay 美国站
-- 🛡️ 海外采集使用反爬虫方案（playwright-extra + puppeteer-extra-plugin-stealth，参考 GitHub 开源项目）
+- 🔍 关键词搜索，**四平台价格并列对比**：1688（国内批发价）/ AliExpress / Amazon / eBay
+- 🛡️ 海外采集使用反爬虫方案（playwright-extra + puppeteer-extra-plugin-stealth + 真实 Chrome 有头模式，参考 GitHub 开源项目）
+- 🌐 **内置代理设置**：支持 HTTP/SOCKS5 代理（Clash/Shadowsocks 等），海外采集走代理节点，无需全局挂 VPN
 - 📋 1688 结果展示：价格、销量、供应商、地区、工厂资质、标签
 - 🔗 一键打开商品详情页（系统默认浏览器）
 - 📱 扫码登录（内置二维码弹窗，自动刷新）
 
-> ⚠️ **海外平台（Amazon/eBay）需要能访问它们的网络环境**：国内直连时 Amazon 价格会被识别为台币(TWD)且时断时续，eBay 基本连不上。**建议挂美国节点 VPN 后再对比**，此时 Amazon 返回 USD、eBay 可正常采集。
+> ⚠️ **海外平台需要海外网络**：国内直连时 Amazon 显示台币(TWD)且时断时续、eBay 连不上、AliExpress 被登录墙拦。**在 App 内「代理设置」里填入你的代理节点（HTTP/SOCKS5）即可**，海外三列会走代理访问。
 
 ## 一键安装（Windows）
 

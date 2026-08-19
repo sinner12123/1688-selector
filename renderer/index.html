@@ -15,6 +15,7 @@
     </div>
     <div class="status">
       <span id="statusText" class="status-text">检测登录中…</span>
+      <button id="proxyBtn" class="btn btn-outline">代理设置</button>
       <button id="loginBtn" class="btn btn-outline">扫码登录</button>
     </div>
   </header>
@@ -56,11 +57,32 @@
   </section>
 
   <main class="content">
-    <div id="hint" class="hint">输入关键词开始选品。首次搜索需启动浏览器，约 10–20 秒，请耐心等待。</div>
+    <div id="hint" class="hint">输入关键词，对比 1688（国内批发价）与 AliExpress / Amazon / eBay（海外零售价）。首次搜索需启动浏览器，约 20–60 秒。</div>
     <div id="loading" class="loading" hidden>正在搜索 1688，请稍候…</div>
     <div id="error" class="error" hidden></div>
     <div id="results" class="results"></div>
   </main>
+
+  <div id="proxyModal" class="modal" hidden>
+    <div class="modal-box">
+      <div class="modal-head">
+        <span>代理设置（海外采集走代理）</span>
+        <button id="proxyClose" class="modal-close">✕</button>
+      </div>
+      <div class="modal-body proxy-body">
+        <label class="proxy-row"><span>启用代理</span><input id="proxyEnabled" type="checkbox" /></label>
+        <label class="proxy-row"><span>类型</span>
+          <select id="proxyType"><option value="http">HTTP</option><option value="socks5">SOCKS5</option></select>
+        </label>
+        <label class="proxy-row"><span>地址</span><input id="proxyHost" type="text" placeholder="127.0.0.1" /></label>
+        <label class="proxy-row"><span>端口</span><input id="proxyPort" type="number" placeholder="7890" /></label>
+        <label class="proxy-row"><span>用户名</span><input id="proxyUser" type="text" placeholder="选填" /></label>
+        <label class="proxy-row"><span>密码</span><input id="proxyPass" type="password" placeholder="选填" /></label>
+        <p class="proxy-tip">示例：Clash 用 HTTP 127.0.0.1:7890；Shadowsocks 用 SOCKS5 127.0.0.1:1080。</p>
+        <button id="proxySave" class="btn btn-primary">保存</button>
+      </div>
+    </div>
+  </div>
 
   <div id="loginModal" class="modal" hidden>
     <div class="modal-box">

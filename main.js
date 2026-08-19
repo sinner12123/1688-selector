@@ -3,10 +3,26 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const { spawn } = require('child_process');
+const { scrapeOverseas } = require('./scrape.js');
 
 const HOME_1688 = process.env.BB1688_HOME || path.join(os.homedir(), '.1688');
 const STATE_FILE = path.join(HOME_1688, 'state.json');
 const QR_FILE = path.join(HOME_1688, 'login-qr.png');
+
+// App 配置（代理等）
+const CONFIG_FILE = path.join(os.homedir(), '.1688-selector.json');
+const DEFAULT_PROXY = { enabled: false, type: 'http', host: '127.0.0.1', port: '', username: '', password: '' };
+function readConfig() {
+  try {
+    const c = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+    return Object.assign({ proxy: { ...DEFAULT_PROXY } }, c);
+  } catch {
+    return { proxy: { ...DEFAULT_PROXY } };
+  }
+}
+function writeConfig(c) {
+  try { fs.writeFileSync(CONFIG_FILE, JSON.stringify(c, null, 2)); return true; } catch { return false; }
+}
 
 // 解析 1688-cli 命令（优先绝对路径，避免 PATH 依赖）
 function resolveCli() {
@@ -169,6 +185,17 @@ app.whenReady().then(() => {
   ipcMain.handle('getStatus', () => { log('IPC getStatus called (renderer -> main OK)'); return getStatus(); });
   ipcMain.handle('login', () => doLogin());
   ipcMain.handle('loginPoll', () => doLoginPoll());
+  ipcMain.handle('overseas', (e, kw) => {
+    const cfg = readConfig();
+    return scrapeOverseas(kw, cfg.proxy);
+  });
+  ipcMain.handle('getProxyConfig', () => readConfig().proxy);
+  ipcMain.handle('setProxyConfig', (e, proxy) => {
+    const cfg = readConfig();
+    cfg.proxy = Object.assign({ ...DEFAULT_PROXY }, proxy || {});
+    writeConfig(cfg);
+    return readConfig().proxy;
+  });
   ipcMain.handle('openExternal', (e, url) => {
     if (typeof url === 'string' && /^https?:\/\//.test(url)) shell.openExternal(url);
     return true;

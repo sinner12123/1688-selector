@@ -9,5 +9,10 @@
   "license": "MIT",
   "devDependencies": {
     "electron": "^43.4.1"
+  },
+  "dependencies": {
+    "playwright-core": "^1.62.1",
+    "playwright-extra": "^4.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
   }
 }

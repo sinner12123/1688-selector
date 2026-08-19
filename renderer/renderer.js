@@ -19,6 +19,16 @@ const els = {
   qrImg: $('#qrImg'),
   loginState: $('#loginState'),
   modalClose: $('#modalClose'),
+  proxyBtn: $('#proxyBtn'),
+  proxyModal: $('#proxyModal'),
+  proxyClose: $('#proxyClose'),
+  proxyEnabled: $('#proxyEnabled'),
+  proxyType: $('#proxyType'),
+  proxyHost: $('#proxyHost'),
+  proxyPort: $('#proxyPort'),
+  proxyUser: $('#proxyUser'),
+  proxyPass: $('#proxyPass'),
+  proxySave: $('#proxySave'),
 };
 
 let pollTimer = null;
@@ -37,88 +47,90 @@ async function refreshStatus() {
   }
 }
 
-// —— 搜索结果渲染 ——
-function renderResults(data) {
-  els.hint.hidden = true;
-  els.error.hidden = true;
-  const offers = data.offers || [];
-  if (!offers.length) {
-    els.results.innerHTML = '<div class="hint">没有找到结果，换个关键词试试。</div>';
+// —— 单列渲染 ——
+function renderColumn(grid, title, currencyHint, items, error) {
+  const col = document.createElement('div');
+  col.className = 'column';
+
+  const head = document.createElement('div');
+  head.className = 'column-head';
+  head.innerHTML = `<b>${title}</b><span class="cur">${currencyHint}</span>`;
+  col.appendChild(head);
+
+  if (error) {
+    const err = document.createElement('div');
+    err.className = 'column-error';
+    err.textContent = error;
+    col.appendChild(err);
+    grid.appendChild(col);
     return;
   }
+  if (!items.length) {
+    const empty = document.createElement('div');
+    empty.className = 'column-empty';
+    empty.textContent = '无结果';
+    col.appendChild(empty);
+    grid.appendChild(col);
+    return;
+  }
+  items.forEach((it) => {
+    const row = document.createElement('div');
+    row.className = 'item-row';
+    const price = document.createElement('div');
+    price.className = 'item-price';
+    price.textContent = it.price || '-';
+    const t = document.createElement('div');
+    t.className = 'item-title';
+    t.textContent = it.title || '(无标题)';
+    t.title = it.title || '';
+    row.append(price, t);
+    if (it.sub) {
+      const sub = document.createElement('div');
+      sub.className = 'item-sub';
+      sub.textContent = it.sub;
+      row.appendChild(sub);
+    }
+    if (it.link) {
+      row.style.cursor = 'pointer';
+      row.onclick = () => window.api.openExternal(it.link);
+    }
+    col.appendChild(row);
+  });
+  grid.appendChild(col);
+}
+
+// —— 三列对比渲染 ——
+function renderComparison(kw, dom, ov) {
+  els.results.innerHTML = '';
   const summary = document.createElement('div');
   summary.className = 'results-summary';
-  summary.textContent = `关键词「${data.keyword || ''}」共返回 ${offers.length} 条（命中 ${data.total ?? offers.length}）`;
-  els.results.innerHTML = '';
+  summary.textContent = `关键词「${kw}」 · 三平台价格对比`;
   els.results.appendChild(summary);
 
-  offers.forEach((o) => {
-    const price = (o.price && o.price.text) || '-';
-    const sales = (o.demand && o.demand.orderCountText) || (o.turnover || '-');
-    const sup = (o.supplier && o.supplier.name) || '-';
-    const years = o.supplier && o.supplier.years ? ` · 经营${o.supplier.years}年` : '';
-    const loc = o.location ? `${o.location.province || ''}${o.location.city || ''}` : '';
-    const factory = o.verified && o.verified.factory;
-    const tags = (o.tags || []).slice(0, 4);
+  const domItems = (dom.ok ? (dom.offers || []) : []).map((o) => ({
+    title: o.title,
+    price: (o.price && o.price.text) || '-',
+    link: o.url,
+    sub: `${(o.demand && o.demand.orderCountText) || '-'} 单 · ${(o.supplier && o.supplier.name) || ''}`,
+  }));
 
-    const card = document.createElement('div');
-    card.className = 'card';
+  const ovErr = (ov.errors && ov.errors.launch) || null;
+  const netBlocked = /ERR_CONNECTION_CLOSED|ERR_CONNECTION_RESET|ERR_NAME_NOT_RESOLVED|ERR_TIMED_OUT|ERR_INTERNET_DISCONNECTED/i;
 
-    const title = document.createElement('div');
-    title.className = 'card-title';
-    title.textContent = o.title || '(无标题)';
+  if ((ov.errors && (netBlocked.test(ov.errors.ebay || '') || netBlocked.test(ov.errors.amazon || ''))) || netBlocked.test(ovErr || '')) {
+    const banner = document.createElement('div');
+    banner.className = 'net-banner';
+    banner.textContent = '⚠️ 海外平台采集失败：当前网络（国内）无法直连 Amazon/eBay。请挂 VPN/代理后重试。';
+    els.results.appendChild(banner);
+  }
 
-    const priceEl = document.createElement('div');
-    priceEl.className = 'card-price';
-    priceEl.textContent = price;
-
-    const meta = document.createElement('div');
-    meta.className = 'card-meta';
-    meta.innerHTML = '';
-    const salesEl = document.createElement('span');
-    salesEl.textContent = `销量 ${sales}`;
-    meta.appendChild(salesEl);
-    if (loc) {
-      const locEl = document.createElement('span');
-      locEl.textContent = loc;
-      meta.appendChild(locEl);
-    }
-    if (factory) {
-      const fEl = document.createElement('span');
-      fEl.className = 'badge factory';
-      fEl.textContent = '工厂';
-      meta.appendChild(fEl);
-    }
-    if (o.bizType) {
-      const bEl = document.createElement('span');
-      bEl.textContent = o.bizType;
-      meta.appendChild(bEl);
-    }
-
-    const supEl = document.createElement('div');
-    supEl.className = 'card-supplier';
-    supEl.textContent = `供应商：${sup}${years}`;
-
-    const tagsEl = document.createElement('div');
-    tagsEl.className = 'card-meta';
-    tags.forEach((t) => {
-      const tEl = document.createElement('span');
-      tEl.className = 'badge';
-      tEl.textContent = t;
-      tagsEl.appendChild(tEl);
-    });
-
-    const actions = document.createElement('div');
-    actions.className = 'card-actions';
-    const openBtn = document.createElement('button');
-    openBtn.className = 'btn btn-outline';
-    openBtn.textContent = '打开商品页 ↗';
-    openBtn.onclick = () => o.url && window.api.openExternal(o.url);
-    actions.appendChild(openBtn);
-
-    card.append(title, priceEl, meta, supEl, tagsEl, actions);
-    els.results.appendChild(card);
-  });
+  const grid = document.createElement('div');
+  grid.className = 'compare-grid';
+  renderColumn(grid, '1688 国内批发价', '¥ CNY', domItems, dom.ok ? null : (dom.error || '搜索失败'));
+  renderColumn(grid, 'AliExpress 速卖通', 'USD', ov.aliexpress || [], (ov.errors && ov.errors.aliexpress) || null);
+  renderColumn(grid, 'Amazon 美国站', '价格随地区', ov.amazon || [], (ov.errors && ov.errors.amazon) || null);
+  renderColumn(grid, 'eBay 美国站', '价格随地区', ov.ebay || [], (ov.errors && ov.errors.ebay) || null);
+  els.results.appendChild(grid);
 }
 
 // —— 搜索 ——
@@ -128,6 +140,7 @@ async function doSearch() {
   els.searchBtn.disabled = true;
   els.loading.hidden = false;
   els.error.hidden = true;
+  els.hint.hidden = true;
   els.results.innerHTML = '';
   const opts = {
     sort: els.sort.value,
@@ -138,17 +151,17 @@ async function doSearch() {
     excludeAds: els.excludeAds.checked,
   };
   try {
-    const res = await window.api.search(kw, opts);
-    if (res.ok) {
-      els.loading.hidden = true;
-      renderResults(res);
-    } else {
-      els.loading.hidden = true;
-      showError(res.error || '搜索失败');
-    }
+    const [domRes, ovRes] = await Promise.allSettled([
+      window.api.search(kw, opts),
+      window.api.overseas(kw),
+    ]);
+    els.loading.hidden = true;
+    const dom = domRes.status === 'fulfilled' ? domRes.value : { ok: false, error: '1688 搜索失败', offers: [] };
+    const ov = ovRes.status === 'fulfilled' ? ovRes.value : { ebay: [], amazon: [], errors: { launch: '采集失败' } };
+    renderComparison(kw, dom, ov);
   } catch (e) {
     els.loading.hidden = true;
-    showError(String(e && e.message || e));
+    showError(String((e && e.message) || e));
   } finally {
     els.searchBtn.disabled = false;
   }
@@ -189,12 +202,51 @@ function closeLogin() {
   els.loginModal.hidden = true;
 }
 
+// —— 代理设置 ——
+async function loadProxy() {
+  const p = await window.api.getProxyConfig();
+  if (!p) return;
+  els.proxyEnabled.checked = !!p.enabled;
+  els.proxyType.value = p.type === 'socks5' ? 'socks5' : 'http';
+  els.proxyHost.value = p.host || '';
+  els.proxyPort.value = p.port || '';
+  els.proxyUser.value = p.username || '';
+  els.proxyPass.value = p.password || '';
+  updateProxyBtnLabel(p);
+}
+function updateProxyBtnLabel(p) {
+  const badge = (p && p.enabled && p.host && p.port) ? `（已启用 ${p.host}:${p.port}）` : '';
+  els.proxyBtn.textContent = '代理设置' + badge;
+}
+async function saveProxy() {
+  const proxy = {
+    enabled: els.proxyEnabled.checked,
+    type: els.proxyType.value,
+    host: els.proxyHost.value.trim(),
+    port: els.proxyPort.value.trim(),
+    username: els.proxyUser.value.trim(),
+    password: els.proxyPass.value,
+  };
+  const saved = await window.api.setProxyConfig(proxy);
+  updateProxyBtnLabel(saved);
+  els.proxyModal.hidden = true;
+}
+function openProxy() {
+  loadProxy();
+  els.proxyModal.hidden = false;
+}
+
 // —— 事件绑定 ——
 els.searchBtn.addEventListener('click', doSearch);
 els.keyword.addEventListener('keydown', (e) => { if (e.key === 'Enter') doSearch(); });
 els.loginBtn.addEventListener('click', openLogin);
 els.modalClose.addEventListener('click', closeLogin);
 els.loginModal.addEventListener('click', (e) => { if (e.target === els.loginModal) closeLogin(); });
+els.proxyBtn.addEventListener('click', openProxy);
+els.proxyClose.addEventListener('click', () => { els.proxyModal.hidden = true; });
+els.proxySave.addEventListener('click', saveProxy);
+els.proxyModal.addEventListener('click', (e) => { if (e.target === els.proxyModal) els.proxyModal.hidden = true; });
 
 // —— 初始化 ——
 refreshStatus();
+loadProxy();

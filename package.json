@@ -1,0 +1,13 @@
+{
+  "name": "1688-selector",
+  "version": "0.1.0",
+  "description": "跨境电商选品桌面应用 —— 基于 1688-cli 浏览器自动化，不调用 1688 官方 API",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.2.0"
+  }
+}

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'" />
+  <title>1688 选品助手</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">🛒</span>
+      <span class="title">1688 选品助手</span>
+      <span class="subtitle">跨境选品 · 浏览器自动化 · 不调用官方 API</span>
+    </div>
+    <div class="status">
+      <span id="statusText" class="status-text">检测登录中…</span>
+      <button id="loginBtn" class="btn btn-outline">扫码登录</button>
+    </div>
+  </header>
+
+  <section class="search-panel">
+    <div class="search-row">
+      <input id="keyword" type="text" placeholder="输入选品关键词，例如：手机壳、宠物用品、香薰机…" />
+      <button id="searchBtn" class="btn btn-primary">🔍 搜索</button>
+    </div>
+    <div class="filter-row">
+      <label>排序
+        <select id="sort">
+          <option value="relevance">综合</option>
+          <option value="best-selling">销量优先</option>
+          <option value="price-asc">价格从低到高</option>
+          <option value="price-desc">价格从高到低</option>
+        </select>
+      </label>
+      <label>数量
+        <select id="max">
+          <option value="10">10</option>
+          <option value="20" selected>20</option>
+          <option value="30">30</option>
+          <option value="50">50</option>
+        </select>
+      </label>
+      <label>资质
+        <select id="verified">
+          <option value="any">不限</option>
+          <option value="factory">工厂</option>
+          <option value="business">贸易/商业</option>
+          <option value="super-factory">超级工厂</option>
+        </select>
+      </label>
+      <label>最低价 <input id="priceMin" type="number" min="0" placeholder="元" /></label>
+      <label>最高价 <input id="priceMax" type="number" min="0" placeholder="元" /></label>
+      <label class="checkbox"><input id="excludeAds" type="checkbox" /> 排除广告位</label>
+    </div>
+  </section>
+
+  <main class="content">
+    <div id="hint" class="hint">输入关键词开始选品。首次搜索需启动浏览器，约 10–20 秒，请耐心等待。</div>
+    <div id="loading" class="loading" hidden>正在搜索 1688，请稍候…</div>
+    <div id="error" class="error" hidden></div>
+    <div id="results" class="results"></div>
+  </main>
+
+  <div id="loginModal" class="modal" hidden>
+    <div class="modal-box">
+      <div class="modal-head">
+        <span>扫码登录 1688</span>
+        <button id="modalClose" class="modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-tip">用手机上的 <b>1688</b> 或 <b>淘宝</b> App 扫描下方二维码，并在手机上点「确认登录」。</p>
+        <img id="qrImg" class="qr" alt="登录二维码" />
+        <p id="loginState" class="login-state">等待二维码…</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

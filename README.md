@@ -29,14 +29,25 @@
 
 > 需要 Windows 10/11；未安装 winget 时请手动安装 Node.js LTS（https://nodejs.org/）。
 
-## 运行
+## 手动运行
 
-前置条件：已安装 `1688-cli`（`npm i -g 1688-cli`）并已完成一次扫码登录。
+前置条件：已安装 Node.js 与 `1688-cli`（`npm i -g 1688-cli`）并已完成一次扫码登录。
 
 ```bash
 npm install        # 首次运行，安装 Electron
 npm start          # 启动桌面应用
 ```
+
+## 构建打包（Windows 单文件 exe）
+
+```bash
+# 设置打包环境变量（路径按本机实际修改）
+set NODE_EXE=C:\Program Files\nodejs\node.exe
+set PW_ROOT=%LOCALAPPDATA%\ms-playwright
+npm run build      # 产物在 dist/1688 Selector.exe
+```
+
+> `NODE_EXE` 是内置 Node 运行时；`PW_ROOT` 是 playwright 浏览器缓存目录（内含 chromium 等），两者都会被打进包内，保证目标机器无需预装环境。
 
 > 首次搜索会启动浏览器上下文，约 10–20 秒，属正常现象。
 

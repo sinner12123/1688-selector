@@ -4,15 +4,47 @@
   "description": "跨境电商选品桌面应用 —— 基于 1688-cli 浏览器自动化，不调用 1688 官方 API",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "build": "electron-builder --win portable",
+    "build:dir": "electron-builder --win --dir"
   },
   "license": "MIT",
   "devDependencies": {
-    "electron": "^43.4.1"
+    "electron": "^43.4.1",
+    "electron-builder": "^26.15.3"
   },
   "dependencies": {
+    "1688-cli": "^0.1.47",
     "playwright-core": "^1.62.1",
     "playwright-extra": "^4.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2"
+  },
+  "build": {
+    "appId": "com.1688selector.app",
+    "productName": "1688 Selector",
+    "artifactName": "${productName}.exe",
+    "directories": {
+      "output": "dist"
+    },
+    "asar": false,
+    "files": [
+      "main.js",
+      "preload.js",
+      "scrape.js",
+      "translate.js",
+      "renderer/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      { "from": "${env.NODE_EXE}", "to": "node.exe" },
+      { "from": "${env.PW_ROOT}", "to": "ms-playwright" }
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "icon": "assets/icon.ico"
+    }
   }
 }

@@ -1,13 +1,20 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const { spawn } = require('child_process');
-const { scrapeOverseas } = require('./scrape.js');
+const { scrapeEbay, scrapeAmazon, scrapeAliExpress, buildProxy } = require('./scrape.js');
+const { zhToEn } = require('./translate.js');
 
 const HOME_1688 = process.env.BB1688_HOME || path.join(os.homedir(), '.1688');
 const STATE_FILE = path.join(HOME_1688, 'state.json');
 const QR_FILE = path.join(HOME_1688, 'login-qr.png');
+
+// 打包后使用内置 Chromium（extraResources 复制到 resources/ms-playwright）
+const bundledBrowsers = path.join(process.resourcesPath, 'ms-playwright');
+if (fs.existsSync(path.join(bundledBrowsers, 'chromium-1234')) || fs.existsSync(path.join(bundledBrowsers, 'chromium_headless_shell-1234'))) {
+  process.env.PLAYWRIGHT_BROWSERS_PATH = bundledBrowsers;
+}
 
 // App 配置（代理等）
 const CONFIG_FILE = path.join(os.homedir(), '.1688-selector.json');
@@ -24,9 +31,36 @@ function writeConfig(c) {
   try { fs.writeFileSync(CONFIG_FILE, JSON.stringify(c, null, 2)); return true; } catch { return false; }
 }
 
-// 解析 1688-cli 命令（优先绝对路径，避免 PATH 依赖）
+// 海外采集缓存（按 平台:关键词，TTL 5 分钟）+ 翻译
+const OVERSEAS_CACHE_TTL = 5 * 60 * 1000;
+const overseasCache = new Map();
+const SCRAPERS = { ebay: scrapeEbay, amazon: scrapeAmazon, aliexpress: scrapeAliExpress };
+
+async function cachedOverseas(platform, keyword, proxy) {
+  const key = platform + ':' + keyword;
+  const hit = overseasCache.get(key);
+  if (hit && Date.now() - hit.ts < OVERSEAS_CACHE_TTL) {
+    return { items: hit.items, error: hit.error, cached: true };
+  }
+  const fn = SCRAPERS[platform];
+  const r = await fn(keyword, proxy);
+  overseasCache.set(key, { items: r.items, error: r.error, ts: Date.now() });
+  return { items: r.items, error: r.error, cached: false };
+}
+
+async function overseasHandler(platform, kw) {
+  const cfg = readConfig();
+  const proxy = buildProxy(cfg.proxy);
+  const enKeyword = await zhToEn(kw);
+  const r = await cachedOverseas(platform, enKeyword, proxy);
+  return { platform, keyword: enKeyword, items: r.items, error: r.error, cached: r.cached };
+}
+
+// 解析 1688-cli 命令（打包后优先用内置 cli.js；开发环境退回全局命令）
 function resolveCli() {
   if (process.env.BB1688_CLI) return process.env.BB1688_CLI;
+  const bundled = path.join(__dirname, 'node_modules', '1688-cli', 'dist', 'cli.js');
+  if (fs.existsSync(bundled)) return bundled;
   if (process.platform === 'win32') {
     const candidates = [
       path.join(process.env.APPDATA || '', 'npm', '1688.cmd'),
@@ -40,6 +74,16 @@ function resolveCli() {
   return '1688';
 }
 const CLI = resolveCli();
+const CLI_BUNDLED = CLI.endsWith('.js');
+
+// 解析 node 运行时（打包后用内置 node.exe，开发用系统 node）
+function resolveNode() {
+  if (process.env.BB1688_NODE) return process.env.BB1688_NODE;
+  const bundled = path.join(process.resourcesPath, 'node.exe');
+  if (fs.existsSync(bundled)) return bundled;
+  return 'node';
+}
+const NODE = resolveNode();
 
 // 启动日志（排查用）
 const LOG_FILE = path.join(__dirname, 'startup.log');
@@ -65,12 +109,21 @@ function runCli(args, timeoutMs = 180000) {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const outFile = path.join(os.tmpdir(), `1688-${id}.json`);
     const errFile = path.join(os.tmpdir(), `1688-${id}.err`);
-    const cmd = `"${CLI}" ${args.map(q).join(' ')} > "${outFile}" 2> "${errFile}"`;
+    let outFd = -1, errFd = -1;
     let settled = false;
     let child;
     try {
-      child = spawn(cmd, { shell: true, stdio: 'ignore', windowsHide: true });
+      if (CLI_BUNDLED) {
+        outFd = fs.openSync(outFile, 'w');
+        errFd = fs.openSync(errFile, 'w');
+        child = spawn(NODE, [CLI, ...args], { stdio: ['ignore', outFd, errFd], windowsHide: true });
+      } else {
+        const cmd = `"${CLI}" ${args.map(q).join(' ')} > "${outFile}" 2> "${errFile}"`;
+        child = spawn(cmd, { shell: true, stdio: 'ignore', windowsHide: true });
+      }
     } catch (e) {
+      if (outFd >= 0) { try { fs.closeSync(outFd); } catch {} }
+      if (errFd >= 0) { try { fs.closeSync(errFd); } catch {} }
       resolve({ ok: false, error: String((e && e.message) || e), stdout: '', stderr: '' });
       return;
     }
@@ -88,6 +141,8 @@ function runCli(args, timeoutMs = 180000) {
     child.on('close', (code) => {
       if (settled) return;
       settled = true; clearTimeout(timer);
+      if (outFd >= 0) { try { fs.closeSync(outFd); } catch {} }
+      if (errFd >= 0) { try { fs.closeSync(errFd); } catch {} }
       let stdout = '', stderr = '';
       try { stdout = fs.readFileSync(outFile, 'utf8'); } catch {}
       try { stderr = fs.readFileSync(errFile, 'utf8'); } catch {}
@@ -157,10 +212,10 @@ function doLoginPoll() {
 function createWindow() {
   log('createWindow: start');
   const win = new BrowserWindow({
-    width: 1100,
-    height: 760,
-    minWidth: 780,
-    minHeight: 540,
+    width: 1460,
+    height: 900,
+    minWidth: 960,
+    minHeight: 640,
     title: '1688 选品助手',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -185,10 +240,9 @@ app.whenReady().then(() => {
   ipcMain.handle('getStatus', () => { log('IPC getStatus called (renderer -> main OK)'); return getStatus(); });
   ipcMain.handle('login', () => doLogin());
   ipcMain.handle('loginPoll', () => doLoginPoll());
-  ipcMain.handle('overseas', (e, kw) => {
-    const cfg = readConfig();
-    return scrapeOverseas(kw, cfg.proxy);
-  });
+  ipcMain.handle('overseasEbay', (e, kw) => overseasHandler('ebay', kw));
+  ipcMain.handle('overseasAmazon', (e, kw) => overseasHandler('amazon', kw));
+  ipcMain.handle('overseasAliExpress', (e, kw) => overseasHandler('aliexpress', kw));
   ipcMain.handle('getProxyConfig', () => readConfig().proxy);
   ipcMain.handle('setProxyConfig', (e, proxy) => {
     const cfg = readConfig();
@@ -199,6 +253,20 @@ app.whenReady().then(() => {
   ipcMain.handle('openExternal', (e, url) => {
     if (typeof url === 'string' && /^https?:\/\//.test(url)) shell.openExternal(url);
     return true;
+  });
+  ipcMain.handle('exportCsv', async (e, csvString, defaultName) => {
+    try {
+      const { canceled, filePath } = await dialog.showSaveDialog({
+        title: '导出 CSV',
+        defaultPath: defaultName || '选品对比.csv',
+        filters: [{ name: 'CSV 文件', extensions: ['csv'] }],
+      });
+      if (canceled || !filePath) return { saved: false };
+      fs.writeFileSync(filePath, '\uFEFF' + (csvString || ''), 'utf8');
+      return { saved: true, path: filePath };
+    } catch (err) {
+      return { saved: false, error: String((err && err.message) || err) };
+    }
   });
   createWindow();
   log('createWindow() returned');

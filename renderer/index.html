@@ -24,6 +24,7 @@
     <div class="search-row">
       <input id="keyword" type="text" placeholder="输入选品关键词，例如：手机壳、宠物用品、香薰机…" />
       <button id="searchBtn" class="btn btn-primary">🔍 搜索</button>
+      <button id="exportBtn" class="btn btn-outline">导出 CSV</button>
     </div>
     <div class="filter-row">
       <label>排序
@@ -53,6 +54,8 @@
       <label>最低价 <input id="priceMin" type="number" min="0" placeholder="元" /></label>
       <label>最高价 <input id="priceMax" type="number" min="0" placeholder="元" /></label>
       <label class="checkbox"><input id="excludeAds" type="checkbox" /> 排除广告位</label>
+      <label class="checkbox"><input id="profitToggle" type="checkbox" /> 利润分析</label>
+      <label>汇率 ¥→$ <input id="fxRate" type="number" value="7.2" step="0.01" min="0" /></label>
     </div>
   </section>
 

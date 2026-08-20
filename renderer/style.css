@@ -195,55 +195,65 @@ body {
 .proxy-tip { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 12px 0; }
 .proxy-body .btn { width: 100%; }
 
-/* —— 三列价格对比 —— */
+/* —— 价格对比（2×2 大块布局）—— */
 .compare-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px;
   align-items: start;
 }
 .column {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 14px;
   overflow: hidden;
 }
 .column-head {
-  padding: 11px 14px;
-  font-size: 14px;
+  padding: 14px 18px;
+  font-size: 17px;
   border-bottom: 1px solid var(--border);
   background: #f8fafc;
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
-.column-head .cur { color: var(--muted); font-size: 12px; font-weight: normal; }
+.column-head .cur { color: var(--muted); font-size: 13px; font-weight: normal; }
 .column-error, .column-empty {
-  padding: 18px 14px;
+  padding: 22px 18px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.6;
 }
 .column-error { color: var(--danger); }
+.column-loading { padding: 22px 18px; color: var(--muted); font-size: 15px; }
 .item-row {
-  padding: 10px 14px;
+  padding: 14px 18px;
   border-bottom: 1px solid #f0f2f5;
   transition: background .12s;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 .item-row:last-child { border-bottom: none; }
 .item-row:hover { background: #f8fafc; }
-.item-price { font-size: 16px; font-weight: 700; color: #e11d48; }
 .item-title {
-  font-size: 12px;
+  font-size: 15px;
+  font-weight: 600;
   color: var(--text);
-  line-height: 1.45;
-  margin-top: 3px;
+  line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.item-sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+.item-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.item-price { font-size: 22px; font-weight: 700; color: #e11d48; line-height: 1.2; }
+.item-sub { font-size: 13px; color: var(--muted); }
 .net-banner {
   background: var(--warn-bg);
   border: 1px solid #fed7aa;
@@ -253,6 +263,22 @@ body {
   margin-bottom: 12px;
   font-size: 13px;
 }
+
+/* —— 利润分析卡片 —— */
+.profit-summary {
+  background: linear-gradient(135deg, #fff7ed, #fef2f2);
+  border: 1px solid #fed7aa;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 14px;
+}
+.profit-title { font-weight: 700; font-size: 15px; margin-bottom: 10px; }
+.profit-stats { display: flex; gap: 28px; flex-wrap: wrap; }
+.profit-stat { display: flex; flex-direction: column; gap: 2px; }
+.profit-stat span { color: var(--muted); font-size: 12px; }
+.profit-stat b { font-size: 20px; color: var(--text); }
+.profit-stat em { color: var(--muted); font-size: 12px; font-style: normal; }
+.profit-stat.highlight b { color: var(--success); }
 
 @media (max-width: 860px) {
   .compare-grid { grid-template-columns: 1fr; }

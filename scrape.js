@@ -1,4 +1,4 @@
-// 海外价格采集（AliExpress / Amazon / eBay）
+// 海外价格采集（AliExpress / Amazon / eBay）——按平台独立、可并行
 // 反爬方案参考 GitHub 开源项目：
 //   - p3nnatr4tion/aliexpress-puppeteer  (真实 Chrome + 有头 + stealth)
 //   - sudheer-ranga/aliexpress-product-scraper (mtop API 拦截)
@@ -41,7 +41,9 @@ async function newRealContext(browser, proxy) {
   return browser.newContext(opts);
 }
 
-async function scrapeEbay(page, keyword) {
+// —— 页面级抓取（假设已有打开的 page）——
+
+async function ebayPage(page, keyword) {
   const url = 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(keyword) + '&_sop=12';
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
   const pageTitle = await page.title();
@@ -59,7 +61,7 @@ async function scrapeEbay(page, keyword) {
   return items.slice(0, 10);
 }
 
-async function scrapeAmazon(page, keyword) {
+async function amazonPage(page, keyword) {
   const url = 'https://www.amazon.com/s?k=' + encodeURIComponent(keyword);
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
   await page.waitForTimeout(2000);
@@ -81,20 +83,67 @@ async function scrapeAmazon(page, keyword) {
   return { items: items.slice(0, 10), blocked: false };
 }
 
+// —— 自包含平台抓取（各自管理浏览器，返回 {items, error}）——
+
+async function scrapeEbay(keyword, proxy) {
+  let browser;
+  try {
+    browser = await launchHeadless();
+    const ctx = await newRealContext(browser, proxy);
+    const page = await ctx.newPage();
+    const items = await ebayPage(page, keyword);
+    return { items, error: null };
+  } catch (e) { return { items: [], error: shortErr(e) }; }
+  finally { try { if (browser) await browser.close(); } catch {} }
+}
+
+async function scrapeAmazon(keyword, proxy) {
+  let browser;
+  try {
+    browser = await launchHeadless();
+    const ctx = await newRealContext(browser, proxy);
+    const page = await ctx.newPage();
+    const r = await amazonPage(page, keyword);
+    return { items: r.items || [], error: r.blocked ? '被反爬拦截（CAPTCHA），请稍后重试' : null };
+  } catch (e) { return { items: [], error: shortErr(e) }; }
+  finally { try { if (browser) await browser.close(); } catch {} }
+}
+
 // AliExpress：登录墙基于 IP 信誉，需真实 Chrome + 有头 + stealth
 async function scrapeAliExpress(keyword, proxy) {
-  const browser = await chromium.launch({
-    headless: false,
-    channel: 'chrome',
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--start-maximized'],
-  });
+  let browser;
   try {
+    try {
+      browser = await chromium.launch({
+        headless: false,
+        channel: 'chrome',
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--start-maximized'],
+      });
+    } catch {
+      // 无系统 Chrome 时用内置 Chromium + 反检测标志（尽量伪装成真实浏览器）
+      browser = await chromium.launch({
+        headless: false,
+        ignoreDefaultArgs: ['--enable-automation'],
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--start-maximized',
+          '--disable-blink-features=AutomationControlled',
+          '--disable-infobars',
+          '--no-first-run',
+          '--no-default-browser-check',
+        ],
+      });
+    }
     const ctxOpts = { userAgent: UA, viewport: null, locale: 'en-US' };
     if (proxy) ctxOpts.proxy = proxy;
     const ctx = await browser.newContext(ctxOpts);
     const page = await ctx.newPage();
     await page.addInitScript(() => {
-      Object.defineProperty(navigator, 'webdriver', { get: () => false });
+      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+      Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+      Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+      window.chrome = window.chrome || { runtime: {} };
     });
     const url = 'https://www.aliexpress.com/w/wholesale-' + String(keyword).replace(/\s+/g, '-') + '.html?sortType=total_tranpro_desc';
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -113,49 +162,23 @@ async function scrapeAliExpress(keyword, proxy) {
         return out.slice(0, 10);
       });
     }
-    return { items, blocked };
-  } finally {
-    try { await browser.close(); } catch {}
-  }
+    return { items, error: blocked ? '被登录墙拦截（IP 信誉），请挂海外节点' : null };
+  } catch (e) { return { items: [], error: shortErr(e) }; }
+  finally { try { if (browser) await browser.close(); } catch {} }
 }
 
+// 组合版（供测试脚本用）：三平台并行
 async function scrapeOverseas(keyword, proxyConfig) {
-  const result = { ebay: [], amazon: [], aliexpress: [], errors: {} };
   const proxy = buildProxy(proxyConfig);
-
-  // Amazon + eBay：无头 Chromium + stealth
-  let browser;
-  try {
-    browser = await launchHeadless();
-    const ctx = await newRealContext(browser, proxy);
-
-    try {
-      const page = await ctx.newPage();
-      result.ebay = await scrapeEbay(page, keyword);
-      await page.close();
-    } catch (e) { result.errors.ebay = shortErr(e); }
-
-    try {
-      const page = await ctx.newPage();
-      const r = await scrapeAmazon(page, keyword);
-      result.amazon = r.items || [];
-      if (r.blocked) result.errors.amazon = '被反爬拦截（CAPTCHA），请稍后重试';
-      await page.close();
-    } catch (e) { result.errors.amazon = shortErr(e); }
-  } catch (e) {
-    result.errors.launch = shortErr(e);
-  } finally {
-    try { if (browser) await browser.close(); } catch {}
-  }
-
-  // AliExpress：真实 Chrome + 有头
-  try {
-    const r = await scrapeAliExpress(keyword, proxy);
-    result.aliexpress = r.items || [];
-    if (r.blocked) result.errors.aliexpress = '被登录墙拦截（IP 信誉），请挂海外节点';
-  } catch (e) { result.errors.aliexpress = shortErr(e); }
-
-  return result;
+  const [ebay, amazon, aliexpress] = await Promise.all([
+    scrapeEbay(keyword, proxy),
+    scrapeAmazon(keyword, proxy),
+    scrapeAliExpress(keyword, proxy),
+  ]);
+  return {
+    ebay: ebay.items, amazon: amazon.items, aliexpress: aliexpress.items,
+    errors: { ebay: ebay.error, amazon: amazon.error, aliexpress: aliexpress.error },
+  };
 }
 
-module.exports = { scrapeOverseas, buildProxy };
+module.exports = { scrapeEbay, scrapeAmazon, scrapeAliExpress, scrapeOverseas, buildProxy };

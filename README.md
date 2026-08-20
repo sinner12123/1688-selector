@@ -16,6 +16,14 @@
 
 > ⚠️ **海外平台需要海外网络**：国内直连时 Amazon 显示台币(TWD)且时断时续、eBay 连不上、AliExpress 被登录墙拦。**在 App 内「代理设置」里填入你的代理节点（HTTP/SOCKS5）即可**，海外三列会走代理访问。
 
+## 下载（Windows 免安装版）
+
+直接下载便携版 exe，双击即用，无需安装 Node.js / 浏览器：
+
+👉 [GitHub Releases 下载 1688 Selector.exe](https://github.com/sinner12123/1688-selector/releases/latest)
+
+> 首次启动如提示 Windows Defender 拦截，点击「更多信息 → 仍要运行」即可（未签名应用）。
+
 ## 一键安装（Windows）
 
 双击 `install.bat`，脚本自动完成：

@@ -41,13 +41,12 @@ npm start          # 启动桌面应用
 ## 构建打包（Windows 单文件 exe）
 
 ```bash
-# 设置打包环境变量（路径按本机实际修改）
-set NODE_EXE=C:\Program Files\nodejs\node.exe
-set PW_ROOT=%LOCALAPPDATA%\ms-playwright
-npm run build      # 产物在 dist/1688 Selector.exe
+npm run build      # 产物在 dist/1688 Selector.exe（自动探测 node.exe 与 playwright 浏览器目录）
+npm run build:dir  # 仅解包目录 dist/win-unpacked，不压缩 exe（调试用）
 ```
 
-> `NODE_EXE` 是内置 Node 运行时；`PW_ROOT` 是 playwright 浏览器缓存目录（内含 chromium 等），两者都会被打进包内，保证目标机器无需预装环境。
+> 打包脚本 `scripts/build.js` 自动探测 Node 运行时与 `%LOCALAPPDATA%\ms-playwright` 浏览器缓存并打进包内，目标机器无需预装任何环境。
+> 探测失败时（如未安装 playwright 浏览器）先执行 `npx playwright install chromium`；也可用环境变量 `NODE_EXE` / `PW_ROOT` 手动指定路径。
 
 > 首次搜索会启动浏览器上下文，约 10–20 秒，属正常现象。
 

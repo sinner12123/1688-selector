@@ -187,16 +187,35 @@ async function doSearch(keyword, opts = {}) {
 }
 
 let loginProc = null;
+let loginFds = { outFd: -1, errFd: -1 };
 async function doLogin() {
   await runCli(['daemon', 'stop']); // 释放 profile 锁，避免 LOCK_BUSY
   try { fs.unlinkSync(QR_FILE); } catch {}
   const logFile = path.join(HOME_1688, 'login-app.log');
   const errFile = path.join(HOME_1688, 'login-app.err');
+  // 关闭上一次登录的进程与文件句柄
+  try { if (loginFds.outFd >= 0) fs.closeSync(loginFds.outFd); } catch {}
+  try { if (loginFds.errFd >= 0) fs.closeSync(loginFds.errFd); } catch {}
+  loginFds = { outFd: -1, errFd: -1 };
   try { if (loginProc) loginProc.kill(); } catch {}
-  loginProc = spawn(
-    `"${CLI}" login --timeout 900 > "${logFile}" 2> "${errFile}"`,
-    { shell: true, stdio: 'ignore', windowsHide: true }
-  );
+  try {
+    if (CLI_BUNDLED) {
+      loginFds.outFd = fs.openSync(logFile, 'w');
+      loginFds.errFd = fs.openSync(errFile, 'w');
+      loginProc = spawn(NODE, [CLI, 'login', '--timeout', '900', '--force'], {
+        stdio: ['ignore', loginFds.outFd, loginFds.errFd],
+        windowsHide: true,
+      });
+    } else {
+      loginProc = spawn(
+        `"${CLI}" login --timeout 900 --force > "${logFile}" 2> "${errFile}"`,
+        { shell: true, stdio: 'ignore', windowsHide: true }
+      );
+    }
+  } catch (e) {
+    log('doLogin spawn error:', (e && e.message) || e);
+    return { started: false, error: String((e && e.message) || e) };
+  }
   return { started: true, qrFile: QR_FILE };
 }
 function doLoginPoll() {

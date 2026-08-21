@@ -95,12 +95,12 @@ function log(...a) {
 }
 process.on('uncaughtException', (e) => log('uncaughtException:', (e && e.stack) || e));
 process.on('unhandledRejection', (e) => log('unhandledRejection:', (e && e.stack) || e));
-log('main.js loaded, CLI =', CLI, ', HOME_1688 =', HOME_1688);
+log('main.js loaded, CLI =', CLI, ', NODE =', NODE, ', NODE_exists =', fs.existsSync(NODE), ', HOME_1688 =', HOME_1688);
 
-// 给含空格的参数加引号
+// 给参数加引号（全部加，防止 cmd 元字符注入）
 function q(s) {
   s = String(s).replace(/"/g, '');
-  return /\s/.test(s) ? `"${s}"` : s;
+  return `"${s}"`;
 }
 
 // 执行 CLI：输出重定向到临时文件（避免 pipe、不受输出大小限制）
@@ -131,6 +131,8 @@ function runCli(args, timeoutMs = 180000) {
       if (settled) return;
       settled = true;
       try { child.kill(); } catch {}
+      try { fs.unlinkSync(outFile); } catch {}
+      try { fs.unlinkSync(errFile); } catch {}
       resolve({ ok: false, error: '命令执行超时', stdout: '', stderr: '' });
     }, timeoutMs);
     child.on('error', (e) => {
@@ -165,7 +167,8 @@ function getStatus() {
 }
 
 async function doSearch(keyword, opts = {}) {
-  const kw = String(keyword || '').trim();
+  // 剔除 cmd 元字符，防 shell 注入（dev 模式 runCli 走 cmd 拼接）
+  const kw = String(keyword || '').trim().replace(/[&|<>^%!`"'$();\r\n]/g, '');
   if (!kw) return { ok: false, error: '请输入关键词' };
   const max = Math.min(Math.max(parseInt(opts.max, 10) || 20, 1), 100);
   const args = ['search', kw, '--max', String(max), '--json'];
@@ -191,6 +194,7 @@ let loginFds = { outFd: -1, errFd: -1 };
 async function doLogin() {
   await runCli(['daemon', 'stop']); // 释放 profile 锁，避免 LOCK_BUSY
   try { fs.unlinkSync(QR_FILE); } catch {}
+  try { fs.unlinkSync(STATE_FILE); } catch {} // 清除旧登录态，避免 --force 后 state.json 残留导致误判"已登录"
   const logFile = path.join(HOME_1688, 'login-app.log');
   const errFile = path.join(HOME_1688, 'login-app.err');
   // 关闭上一次登录的进程与文件句柄
@@ -212,8 +216,23 @@ async function doLogin() {
         { shell: true, stdio: 'ignore', windowsHide: true }
       );
     }
+    // spawn 异步失败（如 NODE/CLI 缺失）会走 'error' 事件，必须处理，否则界面永远"正在生成二维码"
+    loginProc.on('error', (e) => {
+      log('login spawn error:', (e && e.message) || e, '| NODE =', NODE, '| NODE_exists =', fs.existsSync(NODE), '| CLI_exists =', fs.existsSync(CLI));
+      try { if (loginFds.outFd >= 0) fs.closeSync(loginFds.outFd); } catch {}
+      try { if (loginFds.errFd >= 0) fs.closeSync(loginFds.errFd); } catch {}
+      loginFds = { outFd: -1, errFd: -1 };
+      loginProc = null;
+    });
+    // 登录进程结束后释放文件句柄
+    loginProc.on('close', () => {
+      try { if (loginFds.outFd >= 0) fs.closeSync(loginFds.outFd); } catch {}
+      try { if (loginFds.errFd >= 0) fs.closeSync(loginFds.errFd); } catch {}
+      loginFds = { outFd: -1, errFd: -1 };
+      loginProc = null;
+    });
   } catch (e) {
-    log('doLogin spawn error:', (e && e.message) || e);
+    log('doLogin spawn error:', (e && e.message) || e, '| NODE =', NODE, '| NODE_exists =', fs.existsSync(NODE), '| CLI_exists =', fs.existsSync(CLI));
     return { started: false, error: String((e && e.message) || e) };
   }
   return { started: true, qrFile: QR_FILE };

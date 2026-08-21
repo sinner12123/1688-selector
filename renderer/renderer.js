@@ -241,7 +241,7 @@ async function openLogin() {
   els.loginState.textContent = '正在生成二维码…';
   const res = await window.api.login();
   if (!res || !res.started) {
-    els.loginState.textContent = '启动登录失败';
+    els.loginState.textContent = '启动登录失败：' + (res && res.error ? res.error : '未知错误');
     return;
   }
   if (pollTimer) clearInterval(pollTimer);

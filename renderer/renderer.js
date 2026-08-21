@@ -239,7 +239,13 @@ async function openLogin() {
   els.loginModal.hidden = false;
   els.qrImg.src = '';
   els.loginState.textContent = '正在生成二维码…';
-  const res = await window.api.login();
+  let res;
+  try {
+    res = await window.api.login();
+  } catch (e) {
+    els.loginState.textContent = '启动登录失败：' + String((e && e.message) || e);
+    return;
+  }
   if (!res || !res.started) {
     els.loginState.textContent = '启动登录失败：' + (res && res.error ? res.error : '未知错误');
     return;
